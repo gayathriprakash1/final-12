@@ -1,0 +1,32 @@
+apiVersion: deploy.cloud.google.com/v1
+kind: DeliveryPipeline
+metadata:
+  name: usecase-i12
+description: main application pipeline
+serialPipeline:
+  stages:
+  - targetId: uc12-dev
+    profiles: 
+    - dev
+  - targetId: uc12-prod
+    profiles: 
+    - prod
+---
+
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: uc12-dev
+description: development cluster
+gke:
+  cluster: projects/sada-seed-2023/locations/asia-south1/clusters/i12-dev-cluster
+---
+
+apiVersion: deploy.cloud.google.com/v1
+kind: Target
+metadata:
+  name: uc12-prod
+description: production cluster
+requireApproval: true
+gke:
+  cluster: projects/sada-seed-2023/locations/asia-south1/clusters/i12-prod-cluster

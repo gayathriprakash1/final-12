@@ -1,0 +1,37 @@
+# apiVersion: skaffold/v2beta16
+# kind: Config
+# profiles:
+# - name: dev
+#   deploy:
+#     kubectl:
+#       manifests:
+#       - k8s-dev.yaml
+
+# - name: prod
+#   deploy:
+#     kubectl:
+#       manifests: 
+#       - k8s-prod.yaml
+
+
+apiVersion: skaffold/v2beta28
+kind: Config
+metadata:
+  name: i12-ska
+build:
+  artifacts:
+  - image: i12-image
+    context: ./
+
+profiles:
+- name: dev
+  deploy:
+    kubectl:
+      manifests:
+      - k8s-dev1.yaml
+
+- name: prod
+  deploy:
+    kubectl:
+      manifests:
+      - k8s-test.yaml

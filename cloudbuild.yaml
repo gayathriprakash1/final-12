@@ -1,0 +1,97 @@
+# steps:
+#     # Build the container image and tag with Git commit hash
+# ### - name: 'gcr.io/cloud-builders/docker'
+# #   args:
+# #     - 'build'
+# #     - '-t'
+# #     - 'gcr.io/sada-seed-2023/usecase12:$SHORT_SHA'
+# #     - '-t'
+# #     - 'gcr.io/sada-seed-2023/usecase12:latest'.kj
+# #     - '.'
+
+
+# #Build the container image
+#   - name: 'gcr.io/cloud-builders/docker'
+#     args: ['build', '-t', 'asia-south1-docker.pkg.dev/sada-seed-2023/usecase12/i12-image:$SHORT_SHA','-t', 'asia-south1-docker.pkg.dev/sada-seed-2023/usecase12/i12-image:latest', '.']
+
+#   # Push the container image to Container Registry
+#   - name: 'gcr.io/cloud-builders/docker'
+#     args: ['push', '--all-tags','asia-south1-docker.pkg.dev/sada-seed-2023/usecase12/i12-image']
+
+  
+#   # # Deploy the  container image to  a Cloud Run
+#   # - name: 'gcr.io/cloud-builders/gcloud'
+#   #   entrypoint: 'bash'
+#   #   args:
+#   #     - '-c'
+#   #     - |
+#   #       gcloud run deploy cloud-run-demo \
+#   #         --allow-unauthenticated \
+#   #         --image=asia-south1-docker.pkg.dev/testcase1-406804/testrepo/my-app-2:tag1 \
+#   #         --set-env-vars INSTANCE_CONNECTION_NAME='testcase1-406804:asia-south1:test-instance' \
+#   #         --set-env-vars DB_USER='test-user' \
+#   #         --set-env-vars DB_PASS='parker' \
+#   #         --set-env-vars DB_NAME='test-db' \
+#   #         --set-env-vars PRIVATE_IP=True \
+#   #         --vpc-connector test-connector \.
+#   #         --region=asia-south1
+# # Deploy using gcloud deploy releases create
+#   - name: 'gcr.io/cloud-builders/gcloud'
+#     args:
+#       - 'deploy'
+#       - 'releases'
+#       - 'create'
+#       - 'i12-release-$SHORT_SHA'  # replace with your release name.M
+#       - '--configuration=clouddeploy.yaml'  # Update this line..
+#       - '--project=sada-seed-2023'    # replace with your project ID
+#       - '--region=asia-south1'         # replace with your region
+#       - '--delivery-pipeline=usecase-i12'  # replace with your pipeline name
+#       - '--images=i12-image=asia-south1-docker.pkg.dev/sada-seed-2023/usecase12/i12-image:latest'
+
+
+substitutions:
+  _REGION: asia-south1
+
+steps:
+- name: 'gcr.io/k8s-skaffold/skaffold'
+  entrypoint: 'sh'
+  args:
+  - -xe
+  - -c
+  - |
+    # Build and push images
+    skaffold build -f skaffold.yaml --file-output=/workspace/artifacts.json \
+                   --default-repo=${_REGION}-docker.pkg.dev/$PROJECT_ID/usecase12 \
+                   --push=true
+                    
+- name: 'google/cloud-sdk:latest'
+  entrypoint: 'sh'
+  args:
+  - -xe
+  - -c
+  - |
+    gcloud config set deploy/region ${_REGION}
+    gcloud deploy apply --file clouddeploy.yaml
+    gcloud deploy releases create i12-${SHORT_SHA} \
+                        --delivery-pipeline usecase-i12 \
+                        --description "$(git log -1  --pretty='%s')" \
+                        --build-artifacts=/workspace/artifacts.json \
+                        --skaffold-file=skaffold.yaml \
+                        # --images=i12-image=asia-south1-docker.pkg.dev/sada-seed-2023/usecase12/i12-image:latest\
+                        
+                  
+                      
+
+
+                    
+#                           - 'deploy'
+#   # replace with your release name.M
+#       - '--configuration=clouddeploy.yaml'  # Update this line..
+#       - '--project=sada-seed-2023'    # replace with your project ID
+#       - '--region=asia-south1'         # replace with your region
+#          # replace with your pipeline name
+#       - '--images=i12-image=asia-south1-docker.pkg.dev/sada-seed-2023/usecase12/i12-image:latest'
+# # options:
+# #   pool:
+# #     name: 'projects/usecase12/locations/asia-south1/workerPools/prod-pool'
+# # timeout: 3600s

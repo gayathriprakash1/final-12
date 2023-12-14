@@ -1,0 +1,150 @@
+
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# [START cloud_sql_proxy_k8s_sa]
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vote12-app-dev
+spec:
+  selector:
+    matchLabels:
+      app: vote12-app-dev
+  template:
+    metadata:
+      labels:
+        app: vote12-app-dev
+    spec:
+      serviceAccountName: i12-dev-ksa
+      nodeSelector:
+        iam.gke.io/gke-metadata-server-enabled: "true"
+      # [END cloud_sql_proxy_k8s_sa]
+      # [START cloud_sql_proxy_k8s_secrets]
+      containers:
+      - name: vote12-app-dev
+        image: asia-south1-docker.pkg.dev/sada-seed-2023/usecase12/i12-image:$SHORT_SHA
+        ports:
+        - containerPort: 8080
+        # ... other container configuration
+        env:
+        - name: PORT
+          value: "8080"
+        - name: INSTANCE_HOST
+          value: "127.0.0.1"
+        - name: DB_PORT
+          value: "3306"
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: dev12-sec
+              key: username
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: dev12-sec
+              key: password
+        # env:
+        # - name: DB_USER
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: <YOUR-DB-SECRET>
+        #       key: username
+        # - name: DB_PASS
+        #   valueFrom:
+        #     secretKeyRef:
+        #       name: <YOUR-DB-SECRET>
+        #       key: password
+        - name: DB_NAME
+          valueFrom:
+            secretKeyRef:
+              name: dev12-sec
+              key: database
+      # [END cloud_sql_proxy_k8s_secrets]
+      # [START cloud_sql_proxy_k8s_container]
+      - name: cloud-sql-proxy
+        # It is recommended to use the latest version of the Cloud SQL Auth Proxy
+        # Make sure to update on a regular schedule!
+        image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.8.0
+        args:
+          # If connecting from a VPC-native GKE cluster, you can use the
+          # following flag to have the proxy connect over private IP
+          # - "--private-ip"
+
+          # Enable structured logging with LogEntry format:
+          - "--structured-logs"
+
+          # Replace DB_PORT with the port the proxy should listen on
+          - "--port=3306"
+          - "sada-seed-2023:asia-south1:i12-instance1"
+        
+        securityContext:
+          # The default Cloud SQL Auth Proxy image runs as the
+          # "nonroot" user and group (uid: 65532) by default.
+          runAsNonRoot: true
+        # You should use resource requests/limits as a best practice to prevent
+        # pods from consuming too many resources and affecting the execution of
+        # other pods. You should adjust the following values based on what your
+        # application needs. For details, see
+        # https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        resources:
+          requests:
+            # The proxy's memory use scales linearly with the number of active
+            # connections. Fewer open connections will use less memory. Adjust
+            # this value based on your application's requirements.
+            memory: "2Gi"
+            # The proxy's CPU use scales linearly with the amount of IO between
+            # the database and the application. Adjust this value based on your
+            # application's requirements.
+            cpu:    "1"
+      # [END cloud_sql_proxy_k8s_container]
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vote12-service-dev
+spec:
+  type: LoadBalancer
+  selector:
+    app: vote12-app
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vote12-ingress-dev
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: vote12-service-dev
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dev12-sec
+type: Opaque
+data:
+  username: ZGV2MTItdXNlcg==
+  password: dXNlY2FzZTEyLTE=
+  database: ZGF0YWJhc2Ux
